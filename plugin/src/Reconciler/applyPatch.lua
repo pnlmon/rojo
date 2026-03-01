@@ -11,6 +11,7 @@ local Log = require(Packages.Log)
 local PatchSet = require(script.Parent.Parent.PatchSet)
 local Types = require(script.Parent.Parent.Types)
 local invariant = require(script.Parent.Parent.invariant)
+local createYieldIfNeeded = require(script.Parent.Parent.yieldIfNeeded)
 
 local decodeValue = require(script.Parent.decodeValue)
 local reify = require(script.Parent.reify)
@@ -18,6 +19,8 @@ local reifyInstance, applyDeferredRefs = reify.reifyInstance, reify.applyDeferre
 local setProperty = require(script.Parent.setProperty)
 
 local function applyPatch(instanceMap, patch)
+	local yieldIfNeeded = createYieldIfNeeded()
+
 	-- Tracks any portions of the patch that could not be applied to the DOM.
 	local unappliedPatch = PatchSet.newEmpty()
 
@@ -37,6 +40,8 @@ local function applyPatch(instanceMap, patch)
 		if not removeInstanceSuccess then
 			table.insert(unappliedPatch.removed, removedIdOrInstance)
 		end
+
+		yieldIfNeeded()
 	end
 
 	for id, virtualInstance in pairs(patch.added) do
@@ -72,12 +77,14 @@ local function applyPatch(instanceMap, patch)
 			)
 		end
 
-		local failedToReify = reifyInstance(deferredRefs, instanceMap, patch.added, id, parentInstance)
+		local failedToReify = reifyInstance(deferredRefs, instanceMap, patch.added, id, parentInstance, yieldIfNeeded)
 
 		if not PatchSet.isEmpty(failedToReify) then
 			Log.debug("Failed to reify as part of applying a patch: {:#?}", failedToReify)
 			PatchSet.assign(unappliedPatch, failedToReify)
 		end
+
+		yieldIfNeeded()
 	end
 
 	for _, update in ipairs(patch.updated) do
@@ -137,7 +144,7 @@ local function applyPatch(instanceMap, patch)
 				[update.id] = mockVirtualInstance,
 			}
 
-			local failedToReify = reifyInstance(deferredRefs, instanceMap, mockAdded, update.id, instance.Parent)
+			local failedToReify = reifyInstance(deferredRefs, instanceMap, mockAdded, update.id, instance.Parent, yieldIfNeeded)
 
 			local newInstance = instanceMap.fromIds[update.id]
 
@@ -224,15 +231,19 @@ local function applyPatch(instanceMap, patch)
 					unappliedUpdate.changedProperties[propertyName] = propertyValue
 					partiallyApplied = true
 				end
+
+				yieldIfNeeded()
 			end
 		end
 
 		if partiallyApplied then
 			table.insert(unappliedPatch.updated, unappliedUpdate)
 		end
+
+		yieldIfNeeded()
 	end
 
-	applyDeferredRefs(instanceMap, deferredRefs, unappliedPatch)
+	applyDeferredRefs(instanceMap, deferredRefs, unappliedPatch, yieldIfNeeded)
 
 	return unappliedPatch
 end
