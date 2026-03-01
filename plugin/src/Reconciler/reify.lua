@@ -4,6 +4,7 @@
 
 local invariant = require(script.Parent.Parent.invariant)
 local PatchSet = require(script.Parent.Parent.PatchSet)
+local createYieldIfNeeded = require(script.Parent.Parent.yieldIfNeeded)
 local setProperty = require(script.Parent.setProperty)
 local decodeValue = require(script.Parent.decodeValue)
 
@@ -11,22 +12,26 @@ local decodeValue = require(script.Parent.decodeValue)
 	Add the given ID and all of its descendants in virtualInstances to the given
 	PatchSet, marked for addition.
 ]]
-local function addAllToPatch(patchSet, virtualInstances, id)
+local function addAllToPatch(patchSet, virtualInstances, id, yieldIfNeeded)
+	yieldIfNeeded()
+
 	local virtualInstance = virtualInstances[id]
 	patchSet.added[id] = virtualInstance
 
 	for _, childId in ipairs(virtualInstance.Children) do
-		addAllToPatch(patchSet, virtualInstances, childId)
+		addAllToPatch(patchSet, virtualInstances, childId, yieldIfNeeded)
 	end
 end
 
-function reifyInstance(deferredRefs, instanceMap, virtualInstances, rootId, parentInstance)
+function reifyInstance(deferredRefs, instanceMap, virtualInstances, rootId, parentInstance, yieldIfNeeded)
+	yieldIfNeeded = yieldIfNeeded or createYieldIfNeeded()
+
 	-- Create an empty patch that will be populated with any parts of this reify
 	-- that could not happen, like instances that couldn't be created and
 	-- properties that could not be assigned.
 	local unappliedPatch = PatchSet.newEmpty()
 
-	reifyInstanceInner(unappliedPatch, deferredRefs, instanceMap, virtualInstances, rootId, parentInstance)
+	reifyInstanceInner(unappliedPatch, deferredRefs, instanceMap, virtualInstances, rootId, parentInstance, yieldIfNeeded)
 
 	return unappliedPatch
 end
@@ -34,7 +39,9 @@ end
 --[[
 	Inner function that defines the core routine.
 ]]
-function reifyInstanceInner(unappliedPatch, deferredRefs, instanceMap, virtualInstances, id, parentInstance)
+function reifyInstanceInner(unappliedPatch, deferredRefs, instanceMap, virtualInstances, id, parentInstance, yieldIfNeeded)
+	yieldIfNeeded()
+
 	local virtualInstance = virtualInstances[id]
 
 	if virtualInstance == nil then
@@ -47,7 +54,7 @@ function reifyInstanceInner(unappliedPatch, deferredRefs, instanceMap, virtualIn
 	local createSuccess, instance = pcall(Instance.new, virtualInstance.ClassName)
 
 	if not createSuccess then
-		addAllToPatch(unappliedPatch, virtualInstances, id)
+		addAllToPatch(unappliedPatch, virtualInstances, id, yieldIfNeeded)
 		return
 	end
 
@@ -81,6 +88,8 @@ function reifyInstanceInner(unappliedPatch, deferredRefs, instanceMap, virtualIn
 		if not setPropertySuccess then
 			unappliedProperties[propertyName] = virtualValue
 		end
+
+		yieldIfNeeded()
 	end
 
 	-- If there were any properties that we failed to assign, push this into our
@@ -93,14 +102,16 @@ function reifyInstanceInner(unappliedPatch, deferredRefs, instanceMap, virtualIn
 	end
 
 	for _, childId in ipairs(virtualInstance.Children) do
-		reifyInstanceInner(unappliedPatch, deferredRefs, instanceMap, virtualInstances, childId, instance)
+		reifyInstanceInner(unappliedPatch, deferredRefs, instanceMap, virtualInstances, childId, instance, yieldIfNeeded)
 	end
 
 	instance.Parent = parentInstance
 	instanceMap:insert(id, instance)
 end
 
-function applyDeferredRefs(instanceMap, deferredRefs, unappliedPatch)
+function applyDeferredRefs(instanceMap, deferredRefs, unappliedPatch, yieldIfNeeded)
+	yieldIfNeeded = yieldIfNeeded or createYieldIfNeeded()
+
 	local function markFailed(id, propertyName, virtualValue)
 		-- If there is already an updated entry in the unapplied patch for this
 		-- ref, use the existing one. This could match other parts of the
@@ -127,6 +138,8 @@ function applyDeferredRefs(instanceMap, deferredRefs, unappliedPatch)
 	end
 
 	for _, entry in deferredRefs do
+		yieldIfNeeded()
+
 		local _, refId = next(entry.virtualValue)
 
 		if refId == nil then
