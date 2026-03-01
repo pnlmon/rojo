@@ -4,8 +4,12 @@
 ]]
 
 local invariant = require(script.Parent.Parent.invariant)
+local createYieldIfNeeded = require(script.Parent.Parent.yieldIfNeeded)
 
-local function hydrate(instanceMap, virtualInstances, rootId, rootInstance)
+local function hydrate(instanceMap, virtualInstances, rootId, rootInstance, yieldIfNeeded)
+	yieldIfNeeded = yieldIfNeeded or createYieldIfNeeded()
+	yieldIfNeeded()
+
 	local virtualInstance = virtualInstances[rootId]
 
 	if virtualInstance == nil then
@@ -24,9 +28,13 @@ local function hydrate(instanceMap, virtualInstances, rootId, rootInstance)
 	end
 
 	for _, childId in ipairs(virtualInstance.Children) do
+		yieldIfNeeded()
+
 		local virtualChild = virtualInstances[childId]
 
 		for childIndex, childInstance in existingChildren do
+			yieldIfNeeded()
+
 			if not isExistingChildVisited[childIndex] then
 				-- We guard accessing Name and ClassName in order to avoid
 				-- tripping over children of DataModel that Rojo won't have
@@ -39,7 +47,7 @@ local function hydrate(instanceMap, virtualInstances, rootId, rootInstance)
 				-- future, or more heuristics could be introduced.
 				if accessSuccess and name == virtualChild.Name and className == virtualChild.ClassName then
 					isExistingChildVisited[childIndex] = true
-					hydrate(instanceMap, virtualInstances, childId, childInstance)
+					hydrate(instanceMap, virtualInstances, childId, childInstance, yieldIfNeeded)
 					break
 				end
 			end

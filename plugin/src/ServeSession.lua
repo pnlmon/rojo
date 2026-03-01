@@ -18,6 +18,7 @@ local PatchSet = require(script.Parent.PatchSet)
 local Reconciler = require(script.Parent.Reconciler)
 local strict = require(script.Parent.strict)
 local Settings = require(script.Parent.Settings)
+local createYieldIfNeeded = require(script.Parent.yieldIfNeeded)
 
 local Status = strict("Session.Status", {
 	NotStarted = "NotStarted",
@@ -208,9 +209,11 @@ function ServeSession:start()
 						end
 
 						Log.debug("Received {} messages from Rojo server", #messagesPacket.messages)
+						local yieldIfNeeded = createYieldIfNeeded()
 
 						for _, message in messagesPacket.messages do
 							self:__applyPatch(message)
+							yieldIfNeeded()
 						end
 						self.__apiContext:setMessageCursor(messagesPacket.messageCursor)
 					end,
@@ -281,6 +284,9 @@ function ServeSession:__replaceInstances(idList)
 	if #idList == 0 then
 		return true, PatchSet.newEmpty()
 	end
+
+	local yieldIfNeeded = createYieldIfNeeded()
+
 	-- It would be annoying if selection went away, so we try to preserve it.
 	local selection = Selection:Get()
 	local selectionMap = {}
@@ -321,6 +327,8 @@ function ServeSession:__replaceInstances(idList)
 	end
 
 	for id, replacement in replacements do
+		yieldIfNeeded()
+
 		local oldInstance = self.__instanceMap.fromIds[id]
 		if not oldInstance then
 			-- TODO: Why would this happen?
@@ -342,6 +350,8 @@ function ServeSession:__replaceInstances(idList)
 					reparentError
 				)
 			end
+
+			yieldIfNeeded()
 		end
 
 		-- ChangeHistoryService doesn't like it if an Instance has been
@@ -361,6 +371,7 @@ function ServeSession:__replaceInstances(idList)
 			-- We need to revert the failed swap to avoid losing the old instance and children.
 			for _, child in replacement:GetChildren() do
 				attemptReparent(child, oldInstance)
+				yieldIfNeeded()
 			end
 			attemptReparent(oldInstance, oldParent)
 
@@ -386,6 +397,8 @@ function ServeSession:__replaceInstances(idList)
 end
 
 function ServeSession:__applyPatch(patch)
+	local yieldIfNeeded = createYieldIfNeeded()
+
 	local patchTimestamp = DateTime.now():FormatLocalTime("LTS", "en-us")
 	local historyRecording = ChangeHistoryService:TryBeginRecording("Rojo: Patch " .. patchTimestamp)
 	if not historyRecording then
@@ -401,6 +414,8 @@ function ServeSession:__applyPatch(patch)
 		if not success then
 			Log.warn("Precommit hook errored: {}", err)
 		end
+
+		yieldIfNeeded()
 	end
 	Timer.stop()
 
@@ -457,6 +472,8 @@ function ServeSession:__applyPatch(patch)
 				Log.warn("Postcommit hook errored: {}", err)
 			end
 		end)
+
+		yieldIfNeeded()
 	end
 	Timer.stop()
 
@@ -467,6 +484,8 @@ end
 
 function ServeSession:__initialSync(serverInfo)
 	return self.__apiContext:read({ serverInfo.rootInstanceId }):andThen(function(readResponseBody)
+		local yieldIfNeeded = createYieldIfNeeded()
+
 		-- Tell the API Context that we're up-to-date with the version of
 		-- the tree defined in this response.
 		self.__apiContext:setMessageCursor(readResponseBody.messageCursor)
@@ -489,6 +508,8 @@ function ServeSession:__initialSync(serverInfo)
 		end
 
 		for _, update in catchUpPatch.updated do
+			yieldIfNeeded()
+
 			if update.id == self.__instanceMap.fromInstances[game] and update.changedClassName ~= nil then
 				-- Non-place projects will try to update the classname of game from DataModel to
 				-- something like Folder, ModuleScript, etc. This would fail, so we exit with a clear
@@ -521,6 +542,8 @@ function ServeSession:__initialSync(serverInfo)
 
 			-- Send back the current properties
 			for _, change in catchUpPatch.updated do
+				yieldIfNeeded()
+
 				local instance = self.__instanceMap.fromIds[change.id]
 				if not instance then
 					continue
@@ -536,6 +559,8 @@ function ServeSession:__initialSync(serverInfo)
 			end
 			-- Remove the additions we've rejected
 			for id, _change in catchUpPatch.added do
+				yieldIfNeeded()
+
 				table.insert(inversePatch.removed, id)
 			end
 
