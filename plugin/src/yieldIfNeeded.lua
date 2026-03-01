@@ -1,4 +1,4 @@
-local DEFAULT_BUDGET_SECONDS = 1 / 10
+local DEFAULT_BUDGET_SECONDS = 1 / 30
 
 local function createYieldIfNeeded(budgetSeconds)
 	local budget = budgetSeconds or DEFAULT_BUDGET_SECONDS

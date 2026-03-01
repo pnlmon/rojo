@@ -26,6 +26,22 @@ local function performRequest(requestParams)
 
 	return Promise.new(function(resolve, reject)
 		coroutine.wrap(function()
+			local function resolveDeferred(...)
+				local length = select("#", ...)
+				local values = { ... }
+				task.defer(function()
+					resolve(unpack(values, 1, length))
+				end)
+			end
+
+			local function rejectDeferred(...)
+				local length = select("#", ...)
+				local values = { ... }
+				task.defer(function()
+					reject(unpack(values, 1, length))
+				end)
+			end
+
 			local success, response = pcall(function()
 				return HttpService:RequestAsync(requestParams)
 			end)
@@ -34,13 +50,13 @@ local function performRequest(requestParams)
 				Log.trace("Request {} success, response {:#?}", requestId, response)
 				local httpResponse = HttpResponse.fromRobloxResponse(response)
 				if httpResponse:isSuccess() then
-					resolve(httpResponse)
+					resolveDeferred(httpResponse)
 				else
-					reject(HttpError.fromResponse(httpResponse))
+					rejectDeferred(HttpError.fromResponse(httpResponse))
 				end
 			else
 				Log.trace("Request {} failure: {:?}", requestId, response)
-				reject(HttpError.fromRobloxErrorString(response))
+				rejectDeferred(HttpError.fromRobloxErrorString(response))
 			end
 		end)()
 	end)
