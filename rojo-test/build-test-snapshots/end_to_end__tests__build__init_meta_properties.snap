@@ -7,6 +7,7 @@ expression: contents
     <Properties>
       <string name="Name">init_meta_properties</string>
       <token name="Technology">1</token>
+      <BinaryString name="Attributes">AgAAACYAAABSQlhfTGlnaHRpbmdUZWNobm9sb2d5VW5pZmllZE1pZ3JhdGlvbgMBIAAAAFJCWF9PcmlnaW5hbFRlY2hub2xvZ3lPbkZpbGVMb2FkBAMAAAA=</BinaryString>
     </Properties>
   </Item>
 </roblox>

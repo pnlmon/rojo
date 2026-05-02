@@ -86,7 +86,7 @@ reqwest = { version = "0.11.24", default-features = false, features = [
     "rustls-tls",
 ] }
 ritz = "0.1.0"
-roblox_install = "1.0.0"
+roblox_install = { git = "https://github.com/Devioxic/roblox-install" }
 serde = { version = "1.0.197", features = ["derive", "rc"] }
 serde_json = "1.0.145"
 jsonc-parser = { version = "0.27.0", features = ["serde"] }
@@ -131,3 +131,13 @@ pretty_assertions = "1.4.0"
 serde_yaml = "0.8.26"
 tempfile = "3.10.1"
 walkdir = "2.5.0"
+
+# Pin rbx-dom to the revvy02 fork which includes the
+# LightingTechnologyUnifiedMigration patch (ensures Roblox doesn't reset
+# LightingStyle to Soft on load). rev pinned for reproducible builds.
+[patch.crates-io]
+rbx_binary = { git = "https://github.com/revvy02/rbx-dom", rev = "7d1c7dc" }
+rbx_dom_weak = { git = "https://github.com/revvy02/rbx-dom", rev = "7d1c7dc" }
+rbx_reflection = { git = "https://github.com/revvy02/rbx-dom", rev = "7d1c7dc" }
+rbx_reflection_database = { git = "https://github.com/revvy02/rbx-dom", rev = "7d1c7dc" }
+rbx_xml = { git = "https://github.com/revvy02/rbx-dom", rev = "7d1c7dc" }

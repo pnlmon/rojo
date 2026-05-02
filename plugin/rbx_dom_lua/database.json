@@ -40292,7 +40292,7 @@
         },
         "LightingStyle": {
           "Name": "LightingStyle",
-          "Scriptability": "Read",
+          "Scriptability": "ReadWrite",
           "DataType": {
             "Enum": "LightingStyle"
           },
