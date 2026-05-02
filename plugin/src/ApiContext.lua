@@ -148,6 +148,7 @@ function ApiContext:connect()
 		:andThen(Http.Response.msgpack)
 		:andThen(rejectWrongProtocolVersion)
 		:andThen(function(body)
+			task.wait()
 			assert(validateApiInfo(body))
 
 			return body
@@ -164,6 +165,7 @@ function ApiContext:read(ids)
 	local url = ("%s/api/read/%s"):format(self.__baseUrl, table.concat(ids, ","))
 
 	return Http.get(url):andThen(rejectFailedRequests):andThen(Http.Response.msgpack):andThen(function(body)
+		task.wait()
 		if body.sessionId ~= self.__sessionId then
 			return Promise.reject("Server changed ID")
 		end
@@ -212,6 +214,7 @@ function ApiContext:write(patch)
 		:andThen(rejectFailedRequests)
 		:andThen(Http.Response.msgpack)
 		:andThen(function(responseBody)
+			task.wait()
 			Log.info("Write response: {:?}", responseBody)
 
 			return responseBody
@@ -237,25 +240,31 @@ function ApiContext:connectWebSocket(packetHandlers)
 		local closed, errored, received
 
 		received = self.__wsClient.MessageReceived:Connect(function(msg)
-			local data = Http.msgpackDecode(msg)
-			if data.sessionId ~= self.__sessionId then
-				Log.warn("Received message with wrong session ID; ignoring")
-				return
-			end
-
-			assert(validateApiSocketPacket(data))
-
-			Log.trace("Received websocket packet: {:#?}", data)
-
-			local handler = packetHandlers[data.packetType]
-			if handler then
-				local ok, err = pcall(handler, data.body)
-				if not ok then
-					Log.error("Error in WebSocket packet handler for type '%s': %s", data.packetType, err)
+			-- Run each packet on its own task thread so the Studio script-time
+			-- meter is per-message and heavy synchronous work (msgpack decode,
+			-- validation, patch application) cannot exhaust the connection thread.
+			task.spawn(function()
+				local data = Http.msgpackDecode(msg)
+				task.wait()
+				if data.sessionId ~= self.__sessionId then
+					Log.warn("Received message with wrong session ID; ignoring")
+					return
 				end
-			else
-				Log.warn("No handler for WebSocket packet type '%s'", data.packetType)
-			end
+
+				assert(validateApiSocketPacket(data))
+
+				Log.trace("Received websocket packet: {:#?}", data)
+
+				local handler = packetHandlers[data.packetType]
+				if handler then
+					local ok, err = pcall(handler, data.body)
+					if not ok then
+						Log.error("Error in WebSocket packet handler for type '%s': %s", data.packetType, err)
+					end
+				else
+					Log.warn("No handler for WebSocket packet type '%s'", data.packetType)
+				end
+			end)
 		end)
 
 		closed = self.__wsClient.Closed:Connect(function()
@@ -284,6 +293,7 @@ function ApiContext:open(id)
 	local url = ("%s/api/open/%s"):format(self.__baseUrl, id)
 
 	return Http.post(url, ""):andThen(rejectFailedRequests):andThen(Http.Response.msgpack):andThen(function(body)
+		task.wait()
 		if body.sessionId ~= self.__sessionId then
 			return Promise.reject("Server changed ID")
 		end
@@ -300,6 +310,7 @@ function ApiContext:serialize(ids: { string })
 		:andThen(rejectFailedRequests)
 		:andThen(Http.Response.msgpack)
 		:andThen(function(response_body)
+			task.wait()
 			if response_body.sessionId ~= self.__sessionId then
 				return Promise.reject("Server changed ID")
 			end
@@ -318,6 +329,7 @@ function ApiContext:refPatch(ids: { string })
 		:andThen(rejectFailedRequests)
 		:andThen(Http.Response.msgpack)
 		:andThen(function(response_body)
+			task.wait()
 			if response_body.sessionId ~= self.__sessionId then
 				return Promise.reject("Server changed ID")
 			end

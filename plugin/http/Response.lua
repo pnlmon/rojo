@@ -34,6 +34,9 @@ function Response:json()
 end
 
 function Response:msgpack()
+	-- Yield before a potentially huge synchronous decode so the
+	-- Studio script-time meter resets before this work runs.
+	task.wait()
 	return msgpack.decode(self.body)
 end
 

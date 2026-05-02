@@ -22,11 +22,10 @@ end
 local sinceLast = os.clock()
 local function waitIf()
 	local now = os.clock()
-	if now - sinceLast > 0.1 then
-		print("Waiting", now - sinceLast)
+	if now - sinceLast > 1 / 30 then
 		task.wait()
+		sinceLast = os.clock()
 	end
-	sinceLast = os.clock()
 end
 
 local function trueEquals(a, b): boolean

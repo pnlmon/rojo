@@ -25,6 +25,7 @@ function Reconciler.new(instanceMap)
 end
 
 function Reconciler:applyPatch(patch)
+	task.wait()
 	Timer.start("Reconciler:applyPatch")
 
 	local unappliedPatch = applyPatch(self.__instanceMap, patch)
@@ -34,6 +35,7 @@ function Reconciler:applyPatch(patch)
 end
 
 function Reconciler:hydrate(virtualInstances, rootId, rootInstance)
+	task.wait()
 	Timer.start("Reconciler:hydrate")
 	local result = hydrate(self.__instanceMap, virtualInstances, rootId, rootInstance)
 	Timer.stop()
@@ -42,6 +44,7 @@ function Reconciler:hydrate(virtualInstances, rootId, rootInstance)
 end
 
 function Reconciler:diff(virtualInstances, rootId)
+	task.wait()
 	Timer.start("Reconciler:diff")
 	local success, result = diff(self.__instanceMap, virtualInstances, rootId)
 	Timer.stop()
